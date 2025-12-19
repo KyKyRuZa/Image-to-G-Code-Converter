@@ -1,5 +1,7 @@
 from PIL import Image, ImageTk
 import math
+import numpy as np
+from config import DEFAULT_CONFIG
 
 def display_image_on_canvas(image, canvas):
     canvas_width = canvas.winfo_width()
@@ -19,14 +21,48 @@ def display_image_on_canvas(image, canvas):
     canvas.delete("all")
     canvas.create_image(canvas_width // 2, canvas_height // 2, image=photo)
     canvas.image = photo
+    return photo
 
 def auto_adjust_scale(image, config):
     width, height = image.size
     max_dimension = max(width, height)
     
-    if max_dimension > 2000:
-        config["scale_factor"] = 0.15
-    elif max_dimension > 1000:
-        config["scale_factor"] = 0.2
-    else:
-        config["scale_factor"] = 0.3
+    work_area_x = config.get("work_area_x", DEFAULT_CONFIG["work_area_x"])
+    work_area_y = config.get("work_area_y", DEFAULT_CONFIG["work_area_y"])
+    
+    scale_x = work_area_x / width * 0.9
+    scale_y = work_area_y / height * 0.9
+    
+    config["scale_factor"] = min(scale_x, scale_y, 0.3)
+    return config["scale_factor"]
+
+def transform_coordinates(x, y, image_width, image_height, scale_factor, work_area_x, work_area_y):
+    y_inverted = image_height - y
+    
+    x_scaled = x * scale_factor
+    y_scaled = y_inverted * scale_factor
+    
+    x_offset = (work_area_x - (image_width * scale_factor)) / 2
+    y_offset = (work_area_y - (image_height * scale_factor)) / 2
+    
+    x_final = x_scaled + x_offset
+    y_final = y_scaled + y_offset
+    
+    x_final = max(0, min(x_final, work_area_x))
+    y_final = max(0, min(y_final, work_area_y))
+    
+    return x_final, y_final
+
+def calculate_safe_z(pen_up_z, safety_margin=5.0):
+    return max(pen_up_z, safety_margin)
+
+def validate_numeric_input(value, min_val=None, max_val=None, default=0):
+    try:
+        num = float(value)
+        if min_val is not None and num < min_val:
+            return min_val
+        if max_val is not None and num > max_val:
+            return max_val
+        return num
+    except (ValueError, TypeError):
+        return default
